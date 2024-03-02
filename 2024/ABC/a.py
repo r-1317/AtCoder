@@ -1,3 +1,5 @@
+from icecream import ic
+
 def main():
   pass
 
