@@ -1,14 +1,12 @@
 import os
 
-if os.path.basename(__file__) == "Main.py":
+if os.path.basename(__file__) != "Main.py":
+  from icecream import ic
+else:
   def ic(*args):
     return None
-else:
-  from icecream import ic
 
-if os.path.basename(__file__) != "Main.py":
-  # ic.disable()
-  pass
+# ic.disable() if os.path.basename(__file__) != "Main.py" else None
 
 def main():
   pass
