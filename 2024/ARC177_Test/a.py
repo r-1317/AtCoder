@@ -2,11 +2,12 @@ import os
 
 if os.path.basename(__file__) != "Main.py":
   from icecream import ic
+  ic.disable()
 else:
   def ic(*args):
     return None
 
-# ic.disable() if os.path.basename(__file__) != "Main.py" else None
+ic.enable() if os.path.basename(__file__) != "Main.py" else None
 
 def main():
   a, b, c, d, e, f = map(int, input().split())  # a:1円, b:5円, c:10円, d:50円, e:100円, f:500円
