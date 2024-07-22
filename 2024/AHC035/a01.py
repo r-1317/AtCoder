@@ -87,6 +87,33 @@ def sort03(seed_list):
 
   return plant_list
 
+# 種の性能の各項目の平均との差と0の大きい方の2乗が大きい順にソート
+def sort04(seed_list):
+  avg_list = [0]*m  # 種の評価項目の平均リスト
+
+  for i in range(m):
+    avg_list[i] = sum([seed_list[j][i] for j in range(60)]) / 60  # 評価項目の平均値を計算
+
+  ic(avg_list)
+
+  score_list = [[i, 0] for i in range(60)]  # 種の評価項目の平均との差の2乗リスト
+
+  for i in range(60):
+    for j in range(m):
+      score_list[i][1] += max((seed_list[i][j] - avg_list[j]),0) ** 2
+
+  ic(score_list)
+
+  score_list.sort(key=lambda x: x[1], reverse=True)  # 種の評価項目の平均との差の2乗が大きい順にソート
+
+  ic(score_list)
+
+  plant_list = [0]*60  # 良い順にソートされた種のリスト
+
+  for i in range(60):
+    plant_list[i] = score_list[i][0]
+
+  return plant_list
 
 # 種を適切な位置に植える
 def plant(seed_list):
@@ -95,7 +122,8 @@ def plant(seed_list):
   # 種の評価項目のリストをソート(ソート方法は以下から選択)
   # plant_list = sort01(seed_list)  
   # plant_list = sort02(seed_list)
-  plant_list = sort03(seed_list)
+  # plant_list = sort03(seed_list)
+  plant_list = sort04(seed_list)
   
   ic(plant_list)
 
