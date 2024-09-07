@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from scipy.sparse.csgraph import dijkstra
+from scipy.sparse.csgraph import floyd_warshall
 
 MyPC = os.path.basename(__file__) != "Main.py"
 if MyPC:
@@ -35,33 +35,31 @@ def main():
 
   for edge in edge_list:
     u, v, t = edge  # u: 始点, v: 終点, t: 時間
-    adj_list[u-1][v-1] = min(adj_list[u-1][v-1], t)
-    adj_list[v-1][u-1] = min(adj_list[v-1][u-1], t)
+    adj_list[u-1][v-1] = min(adj_list[u-1][v-1], t) if adj_list[u-1][v-1] != 0 else t
+    adj_list[v-1][u-1] = min(adj_list[v-1][u-1], t) if adj_list[v-1][u-1] != 0 else t
 
   ic(adj_list)
 
   adj_list = np.array(adj_list)
 
-  # ダイクストラ法で最短経路を求める
-  dist_list, pred_list = dijkstra(adj_list, indices=0, directed=False, return_predecessors=True)
-  defalut_dist = dist_list[n-1]  # 0からn-1までの最短経路
+  # ワーシャルフロイド法で最短経路を求める
+  dist_list, pred_list = floyd_warshall(adj_list, return_predecessors=True)
 
-  path = get_path_row(0, n-1, pred_list)  # 0からn-1までの最短経路
-  ic(path)
+  path_list = [[[] for _ in range(n)] for _ in range(n)]  # 各頂点間の最短経路 ([start][goal])
 
-  loss_list = [0]*n  # 時間ロスのリスト
+  # 各頂点間の最短経路を求める
+  for start in range(n):
+    for goal in range(n):
+      path = get_path_row(start, goal, pred_list[start])
+      path_list[start][goal] = path
 
-  for i, edge in enumerate(edge_list):
-    u, v, t = edge
-    loss = t - adj_list[u-1][v-1]
-    loss_list[i] = loss
+  ic(path_list)
 
-  ic(loss_list)
-
-  q = int(input())  # クエリの数
+  q = int(input())
 
   for _ in range(q):
-    k = int(input())
+    k = int(input())  # 通る橋の数
+    b_list = list(map(int, input().split()))  # 通る橋のリスト
 
 
 
