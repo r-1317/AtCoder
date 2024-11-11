@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>AHC039</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="ahc039">AHC039</h1>
+<h2 id="最初の方針">最初の方針</h2>
+<ul>
+<li>まず、座標を100*100マスに分割する
+<ul>
+<li>マスあたりのサバ-イワシの数を得点と呼ぶ</li>
+</ul>
+</li>
+<li>得点が一番大きいマスを起点とする
+<ul>
+<li>多点スタートもアリ</li>
+</ul>
+</li>
+<li>そこに隣接するマスのリストを作成</li>
+<li>最も得点の高いマスに進出する</li>
+<li>進出したマスに隣接したマスをリストに追加</li>
+<li>リストの中で得点の高いマスに進出する</li>
+<li>以下繰り返し</li>
+</ul>
+<h2 id="01の方針">01の方針</h2>
+<p>上のやつは難しそうなので、もっと簡単なものを</p>
+<ul>
+<li>四角形に限定</li>
+<li>100分割は計算量が大きすぎた
+<ul>
+<li>20分割でいけた</li>
+</ul>
+</li>
+</ul>
+<h2 id="01を踏まえて">01を踏まえて</h2>
+<ul>
+<li>50/350位</li>
+<li>上位層とも大して差がない</li>
+</ul>
+<h2 id="02の方針">02の方針</h2>
+<ul>
+<li>計算量に余裕をもたせるため、10分割にする</li>
+<li>2つの重なる四角形で最も得点の高いものを選ぶ</li>
+<li>四角形1の左上のx,y座標の両方は四角形2のそれよりも若い</li>
+<li>四角形1の左上のx,y座標の片方は四角形2のそれよりも若い</li>
+</ul>
+<h2 id="02を踏まえて">02を踏まえて</h2>
+<ul>
+<li>131/573位</li>
+<li>得点は微増したが、ほぼ変化なし</li>
+</ul>
+<h3 id="20分割に変更し再提出">20分割に変更し、再提出</h3>
+<ul>
+<li>62/593位</li>
+<li>得点はそこそこ増えた</li>
+<li>順位は大きく上がった</li>
+<li>10分割は粗すぎたかも</li>
+<li>時間ギリギリだった
+<ul>
+<li>改良するのは厳しそう</li>
+</ul>
+</li>
+</ul>
+<h2 id="03の方針">03の方針</h2>
+<ul>
+<li>02は凹みの向きが右下のみだった</li>
+<li>四方に対応させる
+<ul>
+<li>02を4回実行する計算時間は無い</li>
+</ul>
+</li>
+<li>盤面を4分割し、最も得点の高いところの対角を凹ませる</li>
+</ul>
+<h2 id="03提出1回目">03提出(1回目)</h2>
+<ul>
+<li>多分どこかに問題がある</li>
+<li>得点は普通に悪い</li>
+</ul>
+<h2 id="04">04</h2>
+<p>得点が悪かったので省略</p>
+<h2 id="総括">総括</h2>
+<ul>
+<li>02が一番良かった</li>
+<li>パフォーマンスが過去最高</li>
+<li>かなりよくできたと思う</li>
+</ul>
+
+            
+            
+        </body>
+        </html>
