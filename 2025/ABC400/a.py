@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 MyPC = os.path.basename(__file__) != "Main.py"
 if MyPC:
@@ -12,7 +11,11 @@ else:
 ic.enable() if MyPC else None
 
 def main():
-  pass
+  a = int(input())
+
+  b = 400 // a
+
+  print(b if a*b == 400 else -1)
 
 if __name__ == "__main__":
   main()

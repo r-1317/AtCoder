@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 MyPC = os.path.basename(__file__) != "Main.py"
 if MyPC:
@@ -12,7 +11,15 @@ else:
 ic.enable() if MyPC else None
 
 def main():
-  pass
+  h, w = map(int, input().split())
+  grid = [input() for _ in range(h)]
+  a, b, c, d = map(int, input().split())
+
+  dp_list = [[10**9] * w for _ in range(h)]
+
+  dp_list[a-1][b-1] = 0
+
+  
 
 if __name__ == "__main__":
   main()

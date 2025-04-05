@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 MyPC = os.path.basename(__file__) != "Main.py"
 if MyPC:
