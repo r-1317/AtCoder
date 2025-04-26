@@ -1,5 +1,9 @@
 .venv/
 __pycache__/
 .vscode/
+task_a.html
+in/
+tools/
+out/
 
-AHC045/
+AHC047/
