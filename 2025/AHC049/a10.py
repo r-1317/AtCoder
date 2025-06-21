@@ -140,11 +140,16 @@ def vf09(coord: Tuple[int, int], w_list: List[List[int]], d_list: List[List[int]
   return d * w * manhattan_distance(coord)
 
 # 10の評価関数
-def vf10(coord: Tuple[int, int], w_list: List[List[int]], d_list: List[List[int]]) -> int:
+def vf10(coord: Tuple[int, int], w_list: List[List[int]], d_list: List[List[int]]) -> float:
   x, y = coord
   w = w_list[x][y]  # 重さ
   d = d_list[x][y]  # 耐久値
-  return manhattan_distance(coord)
+  return manhattan_distance(coord) + d**0.1
+
+def vf06index(x: int, w_list: List[List[int]], d_list: List[List[int]]) -> int:
+  coord = index_to_coord(x)  # インデックスを座標に変換
+  d = d_list[coord[0]][coord[1]]  # 耐久値
+  return d * manhattan_distance(coord)  # 耐久値 * 原点までのマンハッタン距離を評価関数とする
 
 def main():
   _ = input()  # Nの入力だが、0で固定
@@ -155,7 +160,7 @@ def main():
   ans_list = []  # 動きのリスト
   remove_count = 0  # 取り除いたダンボール箱の数
   index_sorted_d = list(range(N * N))  # ダンボール箱のインデックスをソートするためのリスト
-  index_sorted_d.sort(key=lambda x: d_list[x // N][x % N], reverse=True)  # 耐久値が大きい順にソート
+  index_sorted_d.sort(key=lambda x: vf06index(x, w_list, d_list), reverse=True)  # 耐久値が大きい順にソート
   is_box_removed = [False] * (N * N)  # ダンボール箱が取り除かれたかどうかのフラグ
   is_box_removed[0] = True  # (0, 0)のダンボール箱は最初から取り除かれている
   carrying_list = []  # 高橋くんが持っているダンボール箱の重さと耐久値のリスト。[int, int]
