@@ -13,7 +13,7 @@ ic.enable() if MyPC else None
 
 kaijyou = [1]
 
-for i in range(2, 10**8):
+for i in range(2, 10**6):
   kaijyou.append(kaijyou[-1] * i % 998244353)
 
 def cmb(n, r):
