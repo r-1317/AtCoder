@@ -1,4 +1,5 @@
 # Union-Find
+# https://github.com/r-1317/AtCoder/blob/main/library.py
 class UnionFind:
   # n個の頂点がすべて孤立した状態で初期化
   def __init__(self, n):
@@ -312,7 +313,8 @@ class SegmentTree:
 ##############################################################################################################################################################################
 
 
-# NxNの盤面を表現するビットボード 
+# NxNの盤面を表現するビットボード
+# https://github.com/r-1317/AtCoder/blob/main/library.py 
 class BitBoard:
   # N: 盤面のサイズ, board: ビットボードの初期値(指定しない場合はすべて0)
   def __init__(self, N: int, board: int = 0):
