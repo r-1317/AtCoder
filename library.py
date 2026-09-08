@@ -313,6 +313,245 @@ class SegmentTree:
 ##############################################################################################################################################################################
 
 
+# 遅延セグメント木（Codon対応）
+# 参考: https://github.com/atcoder/ac-library/blob/master/atcoder/lazysegtree.hpp
+# op(S, S) -> S: 結合則を満たす演算、e() -> S: その単位元
+# mapping(F, S) -> S: 区間の値に作用を適用する
+# composition(f, g) -> F: gを適用した後にfを適用する作用（f ∘ g）
+# id() -> F: 恒等作用
+# mappingはopを保つこと: mapping(f, op(x, y)) == op(mapping(f, x), mapping(f, y))
+# 値S・作用Fにはそれぞれ同じ型を使い、上記関数は引数を破壊的に変更しないこと。
+# 添字は0始まり、区間は半開区間[l, r)。構築O(N)、領域O(N)。
+# 各関数の計算量をO(1)とすると、all_prodはO(1)、その他の操作はO(log N)。
+class LazySegmentTree:
+  # v: 初期配列、または要素数（全要素をe()で初期化）
+  def __init__(self, op, e, mapping, composition, id, v):
+    self.op = op
+    self.e = e
+    self.mapping = mapping
+    self.composition = composition
+    self.id = id
+    if isinstance(v, int):
+      assert v >= 0
+      values = [e() for _ in range(v)]
+    else:
+      values = list(v)
+    self._n = len(values)
+    self.size = 1
+    self.log = 0
+    while self.size < self._n:
+      self.size <<= 1
+      self.log += 1
+    self.d = [e() for _ in range(2 * self.size)]
+    self.lz = [id() for _ in range(self.size)]
+    for i in range(self._n):
+      self.d[self.size + i] = values[i]
+    for k in range(self.size - 1, 0, -1):
+      self._update(k)
+
+  def _update(self, k: int):
+    self.d[k] = self.op(self.d[2 * k], self.d[2 * k + 1])
+
+  def _all_apply(self, k: int, f):
+    self.d[k] = self.mapping(f, self.d[k])
+    if k < self.size:
+      self.lz[k] = self.composition(f, self.lz[k])
+
+  def _push(self, k: int):
+    self._all_apply(2 * k, self.lz[k])
+    self._all_apply(2 * k + 1, self.lz[k])
+    self.lz[k] = self.id()
+
+  # a[p]をxに置き換える
+  def set(self, p: int, x):
+    assert 0 <= p < self._n
+    p += self.size
+    for i in range(self.log, 0, -1):
+      self._push(p >> i)
+    self.d[p] = x
+    for i in range(1, self.log + 1):
+      self._update(p >> i)
+
+  def get(self, p: int):
+    assert 0 <= p < self._n
+    p += self.size
+    for i in range(self.log, 0, -1):
+      self._push(p >> i)
+    return self.d[p]
+
+  def prod(self, l: int, r: int):
+    assert 0 <= l <= r <= self._n
+    if l == r:
+      return self.e()
+    l += self.size
+    r += self.size
+    for i in range(self.log, 0, -1):
+      if ((l >> i) << i) != l:
+        self._push(l >> i)
+      if ((r >> i) << i) != r:
+        self._push((r - 1) >> i)
+    sml = self.e()
+    smr = self.e()
+    while l < r:
+      if l & 1:
+        sml = self.op(sml, self.d[l])
+        l += 1
+      if r & 1:
+        r -= 1
+        smr = self.op(self.d[r], smr)
+      l >>= 1
+      r >>= 1
+    return self.op(sml, smr)
+
+  def all_prod(self):
+    return self.d[1]
+
+  # apply(p, f): 一点に作用、apply(l, r, f): 区間に作用
+  # Codon専用のstatic.lenで引数の個数をコンパイル時に判定する。
+  def apply(self, l: int, *args):
+    if len(args) == 1:  # CPython, PyPyの場合
+    # if static.len(args) == 1:  # Codonの場合
+      assert 0 <= l < self._n
+      p = l + self.size
+      for i in range(self.log, 0, -1):
+        self._push(p >> i)
+      self.d[p] = self.mapping(args[0], self.d[p])
+      for i in range(1, self.log + 1):
+        self._update(p >> i)
+    elif len(args) == 2:  # CPython, PyPyの場合
+    # elif static.len(args) == 2:  # Codonの場合
+      r, f = args
+      assert 0 <= l <= r <= self._n
+      if l == r:
+        return
+      l += self.size
+      r += self.size
+      for i in range(self.log, 0, -1):
+        if ((l >> i) << i) != l:
+          self._push(l >> i)
+        if ((r >> i) << i) != r:
+          self._push((r - 1) >> i)
+      left, right = l, r
+      while l < r:
+        if l & 1:
+          self._all_apply(l, f)
+          l += 1
+        if r & 1:
+          r -= 1
+          self._all_apply(r, f)
+        l >>= 1
+        r >>= 1
+      for i in range(1, self.log + 1):
+        if ((left >> i) << i) != left:
+          self._update(left >> i)
+        if ((right >> i) << i) != right:
+          self._update((right - 1) >> i)
+    else:
+      raise TypeError("apply expects (p, f) or (l, r, f)")
+
+  # g(prod(l, r))が真となる最大のrを返す。
+  # g(e()) == True、副作用なし、区間を伸ばすと真から偽への変化は高々1回。
+  def max_right(self, l: int, g):
+    assert 0 <= l <= self._n
+    assert g(self.e())
+    if l == self._n:
+      return self._n
+    l += self.size
+    for i in range(self.log, 0, -1):
+      self._push(l >> i)
+    sm = self.e()
+    while True:
+      while l % 2 == 0:
+        l >>= 1
+      if not g(self.op(sm, self.d[l])):
+        while l < self.size:
+          self._push(l)
+          l *= 2
+          nxt = self.op(sm, self.d[l])
+          if g(nxt):
+            sm = nxt
+            l += 1
+        return l - self.size
+      sm = self.op(sm, self.d[l])
+      l += 1
+      if (l & -l) == l:
+        break
+    return self._n
+
+  # g(prod(l, r))が真となる最小のlを返す。gの条件はmax_rightと同じ。
+  def min_left(self, r: int, g):
+    assert 0 <= r <= self._n
+    assert g(self.e())
+    if r == 0:
+      return 0
+    r += self.size
+    for i in range(self.log, 0, -1):
+      self._push((r - 1) >> i)
+    sm = self.e()
+    while True:
+      r -= 1
+      while r > 1 and r % 2:
+        r >>= 1
+      if not g(self.op(self.d[r], sm)):
+        while r < self.size:
+          self._push(r)
+          r = 2 * r + 1
+          nxt = self.op(self.d[r], sm)
+          if g(nxt):
+            sm = nxt
+            r -= 1
+        return r + 1 - self.size
+      sm = self.op(self.d[r], sm)
+      if (r & -r) == r:
+        break
+    return 0
+
+
+"""
+使用例（この文字列内のコードをクラス定義の後にコピーして実行）
+実行: codon run -release example.py（LazySegmentTreeのクラス定義も含める）
+区間最大値の取得・区間代入（非負の高さを管理）。
+典型90問 029 - Long Bricks で使う操作の例:
+https://atcoder.jp/contests/typical90/tasks/typical90_ac
+S = 区間の最大の高さ、F = 代入する高さ。どちらもint型。
+高さに現れない-1を、空区間の単位元・「更新なし」の作用に使う。
+
+def op(x, y):
+  return max(x, y)
+
+def e():
+  return -1
+
+def mapping(f, x):
+  # 更新なし、または空区間ならそのまま。
+  return x if f == -1 or x == -1 else f
+
+def composition(f, g):
+  # 後から来た代入fを優先する。fが更新なしなら以前の作用gを残す。
+  return g if f == -1 else f
+
+def identity():
+  return -1
+
+# 初期の高さは0。要素数だけ渡すとe() == -1で埋まるため、配列を渡す。
+seg = LazySegmentTree(op, e, mapping, composition, identity, [0 for _ in range(5)])
+seg.apply(1, 4, 2)                # [0, 2, 2, 2, 0]（加算ではなく代入）
+print(seg.prod(2, 5))             # 2: 区間[2, 5)の最大の高さ
+height = seg.prod(2, 5) + 1       # その区間に置くレンガの上面の高さ
+seg.apply(2, 5, height)           # [0, 2, 3, 3, 3]
+print(seg.get(2))                 # 3
+print(seg.all_prod())             # 3
+seg.apply(0, 2, 0)                # [0, 0, 3, 3, 3]（高さ0への代入も可能）
+print(seg.prod(0, 2))             # 0
+
+# 問題の1始まりの閉区間[L, R]は、このクラスでは[L - 1, R)に対応。
+"""
+
+
+
+##############################################################################################################################################################################
+
+
 # NxNの盤面を表現するビットボード
 # https://github.com/r-1317/AtCoder/blob/main/library.py 
 class BitBoard:
