@@ -589,32 +589,34 @@ class BitBoard:
 ##############################################################################################################################################################################
 
 
-# SortedSet
-# 平方分割 + set。外部ライブラリ不要、Python / Codon両対応。
-# 要素は同じ型で、ハッシュ可能であること。格納中に値やkeyの結果を変えない。
+# 新版SortedSet (旧版はABC370の提出履歴から探せば見つかると思う)
+# 配列で管理するtreap + 値からノード番号へのdict。CPython / Codon両対応。
+# 要素は同じ型でハッシュ可能であること。格納中に値やkeyの結果を変えない。
 # len: O(1)、in / count: 平均O(1)
-# add / discard / remove / pop: 償却O(√N)、添字 / bisect / index: O(√N)
-# key指定時、同じkeyの要素を探すindex / remove / discardは最悪O(N)。
-# 初期化・集合演算: O(N log N)程度、走査・コピー: O(N)、メモリ: O(N)。
-# keyは比較時に評価するため、軽く副作用のない関数を指定する。
-# sortedcontainersの主要な公開操作に対応（内部用_check / _reset、pickleは対象外）。
-# 比較演算の相手はSortedSetまたはset（Codonにはfrozensetがない）。
+# add / discard / remove / pop / 添字 / bisect / index: 期待O(log N)
+# 走査・コピー: O(N)、連続範囲の走査: 期待O(log N + 出力数)。
+# 初期化: O(N log N)。乱数は64bit xorshift(13, 7, 17)、固定の非ゼロseed。
+# 削除したノード領域は再利用する。メモリはclear / 再構築以降の最大要素数に比例。
+# keyは挿入時に計算して保存。比較演算の相手はSortedSetまたはset。
 # Codonで空集合を作るときはNoneを渡さず、SortedSet()か型付き空リストを使う。
+# 内部用_check / _reset、pickle、frozensetとの比較は対象外。
 class SortedSet:
   def __init__(self, iterable=(), key=None):
     self.key = key
-    self._set = set(() if iterable is None else iterable)
-    a = sorted(self._set, key=key)
-    self._buckets = [a] if a else []
-    self._built_size = 0
-    self._bucket_size = 16
+    a = sorted(set(() if iterable is None else iterable), key=key)
+    self._values = a
+    self._keys = a.copy() if key is None else [key(x) for x in a]
+    self._nodes = {x: i + 1 for i, x in enumerate(a)}
+    # ノード番号0は空の部分木。値とkeyだけは「ノード番号 - 1」で参照。
+    self._left = [0]
+    self._right = [0]
+    self._parent = [0]
+    self._size = [0]
+    self._priority = [0]
+    self._free = [i for i in range(0)]
+    self._root = 0
+    self._rng = 88172645463325252
     self._build(a)
-
-  def _build(self, a):
-    self._built_size = len(a)
-    self._bucket_size = max(16, int(len(a) ** 0.5) + 1)
-    size = self._bucket_size
-    self._buckets = [a[i:i + size] for i in range(0, len(a), size)]
 
   def _key(self, value):
     if self.key is None:
@@ -622,59 +624,187 @@ class SortedSet:
     else:
       return self.key(value)
 
-  # バケット内の二分探索。right=Trueなら同じkeyの直後。
-  def _bisect(self, bucket, key, right=False):
-    lo, hi = 0, len(bucket)
-    while lo < hi:
-      mid = (lo + hi) // 2
-      k = self._key(bucket[mid])
-      if (not key < k) if right else (k < key):
-        lo = mid + 1
-      else:
-        hi = mid
-    return lo
+  def _random64(self):
+    x = self._rng
+    x ^= x << 13
+    # Codonの符号付き右シフトを、64bitの論理右シフトに直す。
+    x ^= (x >> 7) & 0x01ffffffffffffff
+    x ^= x << 17
+    # CPythonの多倍長intとCodonのint64で同一の符号付き64bit値にする。
+    # 2回に分けて引くことで、正の2**63をint64で表現せずに済む。
+    high = ((x >> 63) & 1) << 62
+    self._rng = (x & 0x7fffffffffffffff) - high - high
+    return self._rng
+
+  def _build(self, a):
+    self._values = a
+    self._keys = [self._key(x) for x in a]
+    self._nodes = {x: i + 1 for i, x in enumerate(a)}
+    n = len(a)
+    self._left = [0] * (n + 1)
+    self._right = [0] * (n + 1)
+    self._parent = [0] * (n + 1)
+    self._size = [0] * (n + 1)
+    self._priority = [0] + [self._random64() for _ in a]
+    self._free.clear()
+    # ソート済み配列からCartesian treeをO(N)で構築。
+    stack = [i for i in range(0)]
+    for i in range(1, n + 1):
+      last = 0
+      while stack and self._priority[stack[-1]] < self._priority[i]:
+        last = stack.pop()
+      self._left[i] = last
+      if last:
+        self._parent[last] = i
+      if stack:
+        self._right[stack[-1]] = i
+        self._parent[i] = stack[-1]
+      stack.append(i)
+    self._root = stack[0] if stack else 0
+    order = [self._root] if self._root else []
+    pos = 0
+    while pos < len(order):
+      i = order[pos]
+      pos += 1
+      if self._left[i]:
+        order.append(self._left[i])
+      if self._right[i]:
+        order.append(self._right[i])
+    for i in reversed(order):
+      self._size[i] = 1 + self._size[self._left[i]] + self._size[self._right[i]]
 
   def __len__(self):
-    return len(self._set)
+    return len(self._nodes)
 
   def __bool__(self):
-    return bool(self._set)
+    return bool(self._root)
 
   def __contains__(self, value):
-    return value in self._set
+    return value in self._nodes
 
   def __iter__(self):
-    for bucket in self._buckets:
-      for value in bucket:
-        yield value
+    return self.islice()
 
   def __reversed__(self):
-    for bucket in reversed(self._buckets):
-      for value in reversed(bucket):
-        yield value
+    return self.islice(reverse=True)
 
   def __repr__(self):
     return 'SortedSet(' + repr(list(self)) + ')'
 
-  def _position(self, index):
+  # iを親の位置へ回転する。祖先の部分木サイズは変わらない。
+  def _rotate(self, i):
+    p = self._parent[i]
+    g = self._parent[p]
+    if i == self._left[p]:
+      child = self._right[i]
+      self._left[p] = child
+      self._right[i] = p
+    else:
+      child = self._left[i]
+      self._right[p] = child
+      self._left[i] = p
+    if child:
+      self._parent[child] = p
+    self._parent[p] = i
+    self._parent[i] = g
+    if not g:
+      self._root = i
+    elif self._left[g] == p:
+      self._left[g] = i
+    else:
+      self._right[g] = i
+    self._size[i] = self._size[p]
+    self._size[p] = 1 + self._size[self._left[p]] + self._size[self._right[p]]
+
+  def add(self, value):
+    if value in self._nodes:
+      return
+    key = self._key(value)
+    if self._free:
+      i = self._free.pop()
+      self._values[i - 1] = value
+      self._keys[i - 1] = key
+      self._left[i] = self._right[i] = 0
+      self._size[i] = 1
+      self._priority[i] = self._random64()
+    else:
+      i = len(self._size)
+      self._values.append(value)
+      self._keys.append(key)
+      self._left.append(0)
+      self._right.append(0)
+      self._parent.append(0)
+      self._size.append(1)
+      self._priority.append(self._random64())
+    p, node = 0, self._root
+    while node:
+      p = node
+      self._size[p] += 1
+      node = self._left[p] if key < self._keys[p - 1] else self._right[p]
+    self._parent[i] = p
+    if not p:
+      self._root = i
+    elif key < self._keys[p - 1]:
+      self._left[p] = i
+    else:
+      self._right[p] = i
+    self._nodes[value] = i
+    while self._parent[i] and self._priority[self._parent[i]] < self._priority[i]:
+      self._rotate(i)
+
+  def _erase(self, i):
+    value = self._values[i - 1]
+    # 子を回転して上げ、削除対象の子が高々1つになったら取り外す。
+    while self._left[i] and self._right[i]:
+      l, r = self._left[i], self._right[i]
+      self._rotate(l if self._priority[l] > self._priority[r] else r)
+    child = self._left[i] or self._right[i]
+    p = self._parent[i]
+    if child:
+      self._parent[child] = p
+    if not p:
+      self._root = child
+    elif self._left[p] == i:
+      self._left[p] = child
+    else:
+      self._right[p] = child
+    while p:
+      self._size[p] -= 1
+      p = self._parent[p]
+    del self._nodes[value]
+    self._free.append(i)
+    return value
+
+  def discard(self, value):
+    i = self._nodes.get(value, 0)
+    if i:
+      self._erase(i)
+
+  def remove(self, value):
+    i = self._nodes.get(value, 0)
+    if not i:
+      raise KeyError(str(value))
+    self._erase(i)
+
+  def _node_at(self, index):
     if index < 0:
       index += len(self)
     if index < 0 or index >= len(self):
       raise IndexError('SortedSet index out of range')
-    # 最大値や末尾付近へのアクセスも高速にする。
-    if index < len(self) // 2:
-      for b, bucket in enumerate(self._buckets):
-        if index < len(bucket):
-          return b, index
-        index -= len(bucket)
-    else:
-      index = len(self) - 1 - index
-      for b in range(len(self._buckets) - 1, -1, -1):
-        size = len(self._buckets[b])
-        if index < size:
-          return b, size - 1 - index
-        index -= size
+    node = self._root
+    while node:
+      size = self._size[self._left[node]]
+      if index < size:
+        node = self._left[node]
+      elif index == size:
+        return node
+      else:
+        index -= size + 1
+        node = self._right[node]
     raise IndexError('SortedSet index out of range')
+
+  def pop(self, index=-1):
+    return self._erase(self._node_at(index))
 
   def __getitem__(self, index):
     if isinstance(index, slice):
@@ -685,83 +815,44 @@ class SortedSet:
         return list(self.islice(stop + 1, start + 1, reverse=True))
       return list(self)[index]
     else:
-      b, i = self._position(index)
-      return self._buckets[b][i]
+      return self._values[self._node_at(index) - 1]
 
   def __delitem__(self, index):
     if isinstance(index, slice):
-      removed = self[index]
-      self._set.difference_update(set(removed))
-      self._build([x for x in self if x in self._set])
+      removed = set(self[index])
+      self._build([x for x in self if x not in removed])
     else:
       self.pop(index)
 
-  def add(self, value):
-    if value in self._set:
-      return
-    key = self._key(value)
-    if not self._buckets:
-      self._buckets.append([value])
-    else:
-      b = 0
-      while b + 1 < len(self._buckets) and not key < self._key(self._buckets[b][-1]):
-        b += 1
-      bucket = self._buckets[b]
-      bucket.insert(self._bisect(bucket, key, True), value)
-      if len(bucket) > self._bucket_size * 2:
-        self._build(list(self))
-    self._set.add(value)
-
-  def _pop(self, b, i):
-    value = self._buckets[b].pop(i)
-    self._set.remove(value)
-    if not self._buckets[b] or len(self) * 2 < self._built_size:
-      self._build(list(self))
-    return value
-
-  def pop(self, index=-1):
-    b, i = self._position(index)
-    return self._pop(b, i)
-
-  def discard(self, value):
-    if value in self._set:
-      self.pop(self.index(value))
-
-  def remove(self, value):
-    if value not in self._set:
-      raise KeyError(str(value))
-    self.discard(value)
-
   def clear(self):
-    self._set.clear()
-    self._buckets.clear()
-    self._built_size = 0
-    self._bucket_size = 16
+    self._build(self._values[:0])
 
   def copy(self):
-    a = list(self)
-    result = SortedSet(a[:0], self.key)
-    result._set = self._set.copy()
-    result._build(a)
+    result = SortedSet(self._values[:0], self.key)
+    result._build(list(self))
     return result
 
   def count(self, value):
-    return int(value in self._set)
+    return int(value in self._nodes)
 
   def bisect_key_left(self, key):
-    rank = 0
-    for bucket in self._buckets:
-      if not self._key(bucket[-1]) < key:
-        return rank + self._bisect(bucket, key)
-      rank += len(bucket)
+    rank, node = 0, self._root
+    while node:
+      if self._keys[node - 1] < key:
+        rank += self._size[self._left[node]] + 1
+        node = self._right[node]
+      else:
+        node = self._left[node]
     return rank
 
   def bisect_key_right(self, key):
-    rank = 0
-    for bucket in self._buckets:
-      if key < self._key(bucket[-1]):
-        return rank + self._bisect(bucket, key, True)
-      rank += len(bucket)
+    rank, node = 0, self._root
+    while node:
+      if key < self._keys[node - 1]:
+        node = self._left[node]
+      else:
+        rank += self._size[self._left[node]] + 1
+        node = self._right[node]
     return rank
 
   def bisect_key(self, key):
@@ -777,46 +868,39 @@ class SortedSet:
     return self.bisect_right(value)
 
   def index(self, value, start=None, stop=None):
-    if value not in self._set:
+    node = self._nodes.get(value, 0)
+    if not node:
       raise ValueError('value is not in SortedSet')
+    rank = self._size[self._left[node]]
+    while self._parent[node]:
+      p = self._parent[node]
+      if self._right[p] == node:
+        rank += self._size[self._left[p]] + 1
+      node = p
     lo, hi, step = slice(start, stop).indices(len(self))
-    key = self._key(value)
-    rank = 0
-    for bucket in self._buckets:
-      if rank >= hi:
-        break
-      if rank + len(bucket) > lo and not self._key(bucket[-1]) < key:
-        i = max(self._bisect(bucket, key), lo - rank)
-        while i < len(bucket) and rank + i < hi:
-          if key < self._key(bucket[i]):
-            break
-          if bucket[i] == value:
-            return rank + i
-          i += 1
-      rank += len(bucket)
+    if lo <= rank < hi:
+      return rank
     raise ValueError('value is not in SortedSet')
 
-  # [start, stop)を走査。reverse=Trueでも範囲は昇順の添字で指定する。
+  # 親ポインタで後続・先行要素をたどり、範囲全体を期待O(log N + 出力数)で走査。
   def islice(self, start=None, stop=None, reverse=False):
     lo, hi, step = slice(start, stop).indices(len(self))
     if lo >= hi:
       return
-    if reverse:
-      rank = len(self)
-      for bucket in reversed(self._buckets):
-        rank -= len(bucket)
-        for i in range(min(len(bucket), hi - rank) - 1, max(0, lo - rank) - 1, -1):
-          yield bucket[i]
-        if rank <= lo:
-          break
-    else:
-      rank = 0
-      for bucket in self._buckets:
-        for i in range(max(0, lo - rank), min(len(bucket), hi - rank)):
-          yield bucket[i]
-        rank += len(bucket)
-        if rank >= hi:
-          break
+    node = self._node_at(hi - 1 if reverse else lo)
+    forward = self._left if reverse else self._right
+    backward = self._right if reverse else self._left
+    for _ in range(hi - lo):
+      yield self._values[node - 1]
+      if forward[node]:
+        node = forward[node]
+        while backward[node]:
+          node = backward[node]
+      else:
+        p = self._parent[node]
+        while p and forward[p] == node:
+          node, p = p, self._parent[p]
+        node = p
 
   def irange_key(self, min_key=None, max_key=None, inclusive=(True, True), reverse=False):
     lo = 0 if min_key is None else (self.bisect_key_left(min_key) if inclusive[0] else self.bisect_key_right(min_key))
@@ -830,33 +914,29 @@ class SortedSet:
 
   def update(self, *iterables):
     # 先に集合化して、update(self)や自分自身のイテレータにも対応。
-    values = self._set.copy()
+    values = set(self._nodes)
     # 空の可変長引数でもCodonがループ変数の型を推論できるようにする。
     for iterable in ((), *iterables):
       values.update(iterable)
-    self._set = values
     self._build(sorted(values, key=self.key))
     return self
 
   def difference_update(self, *iterables):
-    values = self._set.copy()
+    values = set(self._nodes)
     for iterable in ((), *iterables):
       values.difference_update(set(iterable))
-    self._set = values
     self._build([x for x in self if x in values])
     return self
 
   def intersection_update(self, *iterables):
-    values = self._set.copy()
-    for iterable in (self._set, *iterables):
+    values = set(self._nodes)
+    for iterable in (self._nodes, *iterables):
       values.intersection_update(set(iterable))
-    self._set = values
     self._build([x for x in self if x in values])
     return self
 
   def symmetric_difference_update(self, other):
-    values = self._set.symmetric_difference(set(other))
-    self._set = values
+    values = set(self._nodes).symmetric_difference(set(other))
     self._build(sorted(values, key=self.key))
     return self
 
@@ -873,17 +953,17 @@ class SortedSet:
     return self.copy().symmetric_difference_update(other)
 
   def issubset(self, other):
-    return self._set.issubset(set(other))
+    return set(self._nodes).issubset(set(other))
 
   def issuperset(self, other):
-    return self._set.issuperset(set(other))
+    return set(self._nodes).issuperset(set(other))
 
   def isdisjoint(self, other):
-    return self._set.isdisjoint(set(other))
+    return set(self._nodes).isdisjoint(set(other))
 
   def __eq__(self, other):
     if isinstance(other, (SortedSet, set)):
-      return self._set == set(other)
+      return set(self._nodes) == set(other)
     return False
 
   def __ne__(self, other):
@@ -896,7 +976,7 @@ class SortedSet:
 
   def __lt__(self, other):
     if isinstance(other, (SortedSet, set)):
-      return self._set < set(other)
+      return set(self._nodes) < set(other)
     raise TypeError('set comparison requires SortedSet or set')
 
   def __ge__(self, other):
@@ -906,7 +986,7 @@ class SortedSet:
 
   def __gt__(self, other):
     if isinstance(other, (SortedSet, set)):
-      return self._set > set(other)
+      return set(self._nodes) > set(other)
     raise TypeError('set comparison requires SortedSet or set')
 
   def __or__(self, other):
