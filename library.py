@@ -1,3 +1,5 @@
+from typing import List
+
 # Union-Find
 # https://github.com/r-1317/AtCoder/blob/main/library.py
 class UnionFind:
@@ -552,7 +554,7 @@ print(seg.prod(0, 2))             # 0
 ##############################################################################################################################################################################
 
 
-# NxNの盤面を表現するビットボード
+# NxNの盤面を表現するビットボード(CPython版)
 # https://github.com/r-1317/AtCoder/blob/main/library.py 
 class BitBoard:
   # N: 盤面のサイズ, board: ビットボードの初期値(指定しない場合はすべて0)
@@ -584,6 +586,54 @@ class BitBoard:
           row.append('0')
       res.append(''.join(row))
     return '\n'.join(res)
+
+
+##############################################################################################################################################################################
+
+
+# NxNの盤面を表現するビットボード(Codonの64bit整数で使えるように改変)
+# https://github.com/r-1317/AtCoder/blob/main/library.py 
+class BitBoard:
+  # N: 盤面のサイズ, board: ビットボードの初期値(指定しない場合はすべて0)
+  def __init__(self, N: int, board: List[int] = [0]):
+    self.N = N
+    # self.board = board
+    board = [0] * ((N * N + 63) // 64) if board == [0] else board
+    self.board = board
+
+  # (x, y)のマスを1にする
+  def set(self, x: int, y: int):
+    # self.board |= (1 << (x * self.N + y))
+    index = (x * self.N + y) // 64
+    bit_position = (x * self.N + y) % 64
+    self.board[index] |= (1 << bit_position)
+
+  # (x, y)のマスを0にする
+  def unset(self, x: int, y: int):
+    # self.board &= ~(1 << (x * self.N + y))
+    index = (x * self.N + y) // 64
+    bit_position = (x * self.N + y) % 64
+    self.board[index] &= ~(1 << bit_position)
+
+  # (x, y)のマスが1かどうかを返す
+  def is_set(self, x: int, y: int) -> bool:
+    index = (x * self.N + y) // 64
+    bit_position = (x * self.N + y) % 64
+    return (self.board[index] >> bit_position) & 1 == 1
+
+  # ビットボードを文字列で表示する
+  def __str__(self):
+    res = []
+    for i in range(self.N):
+      row = []
+      for j in range(self.N):
+        if self.is_set(i, j):
+          row.append('1')
+        else:
+          row.append('0')
+      res.append(''.join(row))
+    return '\n'.join(res)
+# (ここまで) https://github.com/r-1317/AtCoder/blob/main/library.py 
 
 
 ##############################################################################################################################################################################
