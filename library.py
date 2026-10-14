@@ -1,8 +1,7 @@
 from typing import List
 
 # Union-Find
-# https://github.com/r-1317/AtCoder/blob/main/library.py
-class UnionFind:
+class UnionFind:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   # n個の頂点がすべて孤立した状態で初期化
   def __init__(self, n):
     self.parent_list = [-1] * n
@@ -55,7 +54,7 @@ seg.prod(1, 4)  # 9
 seg.set(2, 10)
 seg.all_prod()  # 17
 """
-class SegmentTree:
+class SegmentTree:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   # vには初期配列、または要素数を指定する
   def __init__(self, op, e, v):
     self.op = op
@@ -178,7 +177,7 @@ class SegmentTree:
 
 
 # セグメント木2(これはcodonでも動くはず)
-class SegmentTree:
+class SegmentTree:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   def __init__(self, op, e, v):
     self.op = op
     self.e = e
@@ -325,7 +324,7 @@ class SegmentTree:
 # 値S・作用Fにはそれぞれ同じ型を使い、上記関数は引数を破壊的に変更しないこと。
 # 添字は0始まり、区間は半開区間[l, r)。構築O(N)、領域O(N)。
 # 各関数の計算量をO(1)とすると、all_prodはO(1)、その他の操作はO(log N)。
-class LazySegmentTree:
+class LazySegmentTree:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   # v: 初期配列、または要素数（全要素をe()で初期化）
   def __init__(self, op, e, mapping, composition, id, v):
     self.op = op
@@ -555,8 +554,7 @@ print(seg.prod(0, 2))             # 0
 
 
 # NxNの盤面を表現するビットボード(CPython版)
-# https://github.com/r-1317/AtCoder/blob/main/library.py 
-class BitBoard:
+class BitBoard:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   # N: 盤面のサイズ, board: ビットボードの初期値(指定しない場合はすべて0)
   def __init__(self, N: int, board: int = 0):
     self.N = N
@@ -592,8 +590,7 @@ class BitBoard:
 
 
 # NxNの盤面を表現するビットボード(Codonの64bit整数で使えるように改変)
-# https://github.com/r-1317/AtCoder/blob/main/library.py 
-class BitBoard:
+class BitBoard:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   # N: 盤面のサイズ, board: ビットボードの初期値(指定しない場合はすべて0)
   def __init__(self, N: int, board: List[int] = [0]):
     self.N = N
@@ -650,7 +647,7 @@ class BitBoard:
 # keyは挿入時に計算して保存。比較演算の相手はSortedSetまたはset。
 # Codonで空集合を作るときはNoneを渡さず、SortedSet()か型付き空リストを使う。
 # 内部用_check / _reset、pickle、frozensetとの比較は対象外。
-class SortedSet:
+class SortedSet:  # https://github.com/r-1317/AtCoder/blob/main/library.py
   def __init__(self, iterable=(), key=None):
     self.key = key
     a = sorted(set(() if iterable is None else iterable), key=key)
